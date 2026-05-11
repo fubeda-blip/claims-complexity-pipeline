@@ -1,0 +1,368 @@
+# =========================================================
+# dbt schema.yml
+# =========================================================
+# Purpose:
+# 1. Define Bronze source tables
+# 2. Document dbt models and columns
+# 3. Apply automated data quality tests
+# 4. Validate business rules and data integrity
+# =========================================================
+
+version: 2
+
+
+# =========================================================
+# Source Definitions
+# =========================================================
+# These define the raw Bronze Delta tables created by
+# Databricks Auto Loader.
+# =========================================================
+
+sources:
+
+  - name: bronze
+    database: main
+    schema: bronze
+
+    tables:
+
+      # -----------------------------------------------------
+      # Raw Claims Bronze table
+      # -----------------------------------------------------
+
+      - name: raw_claims
+
+      # -----------------------------------------------------
+      # Raw Medical Activity Bronze table
+      # -----------------------------------------------------
+
+      - name: raw_medical_activity
+
+
+
+# =========================================================
+# Model Definitions
+# =========================================================
+# Each model includes:
+# - descriptions
+# - column-level documentation
+# - automated dbt tests
+# =========================================================
+
+models:
+
+
+  # =======================================================
+  # stg_claims Model
+  # =======================================================
+  # Cleaned and standardized Claims staging model
+  # =======================================================
+
+  - name: stg_claims
+
+    description: >
+      Cleaned and standardized claims data created from the
+      Bronze raw claims table.
+
+    columns:
+
+
+      # ---------------------------------------------------
+      # claim_id
+      # ---------------------------------------------------
+      # Business key for claims
+      # Must exist and be unique
+      # ---------------------------------------------------
+
+      - name: claim_id
+
+        description: "Unique claim identifier."
+
+        tests:
+          - not_null
+          - unique
+
+
+      # ---------------------------------------------------
+      # date_of_loss
+      # ---------------------------------------------------
+      # Every claim should contain a loss date
+      # ---------------------------------------------------
+
+      - name: date_of_loss
+
+        description: "Date the claim loss occurred."
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # body_part
+      # ---------------------------------------------------
+      # Standardized injured body part
+      # ---------------------------------------------------
+
+      - name: body_part
+
+        description: "Standardized injured body part."
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # is_litigated
+      # ---------------------------------------------------
+      # Litigation indicator used in scoring logic
+      # ---------------------------------------------------
+
+      - name: is_litigated
+
+        description: >
+          Boolean flag indicating whether the claim is litigated.
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # number_of_priors
+      # ---------------------------------------------------
+      # Number of prior claims associated with claimant
+      # ---------------------------------------------------
+
+      - name: number_of_priors
+
+        description: "Number of prior claims."
+
+        tests:
+          - not_null
+
+
+
+  # =======================================================
+  # stg_medical_activity Model
+  # =======================================================
+  # Flattened and standardized medical event staging model
+  # =======================================================
+
+  - name: stg_medical_activity
+
+    description: >
+      Flattened and standardized medical activity events
+      created from the Bronze JSON medical activity table.
+
+    columns:
+
+
+      # ---------------------------------------------------
+      # claim_id
+      # ---------------------------------------------------
+      # Claim identifier linking medical events to claims
+      # ---------------------------------------------------
+
+      - name: claim_id
+
+        description: >
+          Claim identifier associated with the medical activity.
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # event_type
+      # ---------------------------------------------------
+      # Standardized medical event type
+      # Only approved event values are allowed
+      # ---------------------------------------------------
+
+      - name: event_type
+
+        description: "Standardized medical event type."
+
+        tests:
+          - not_null
+
+          - accepted_values:
+
+              values:
+                - surgery
+                - opioid prescription
+
+
+      # ---------------------------------------------------
+      # event_date
+      # ---------------------------------------------------
+      # Date the medical activity occurred
+      # ---------------------------------------------------
+
+      - name: event_date
+
+        description: "Date of the medical activity event."
+
+        tests:
+          - not_null
+
+
+
+  # =======================================================
+  # int_claim_complexity_score Model
+  # =======================================================
+  # Intermediate Silver model containing complexity scoring
+  # =======================================================
+
+  - name: int_claim_complexity_score
+
+    description: >
+      Intermediate Silver model that joins claims and medical
+      activity data to calculate claim complexity scores.
+
+    columns:
+
+
+      # ---------------------------------------------------
+      # claim_id
+      # ---------------------------------------------------
+      # One row per claim in scoring model
+      # ---------------------------------------------------
+
+      - name: claim_id
+
+        description: "Unique claim identifier."
+
+        tests:
+          - not_null
+          - unique
+
+
+      # ---------------------------------------------------
+      # complexity_score
+      # ---------------------------------------------------
+      # Numeric claim complexity score
+      # ---------------------------------------------------
+
+      - name: complexity_score
+
+        description: >
+          Numeric score representing claim complexity.
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # complexity_band
+      # ---------------------------------------------------
+      # Business-friendly complexity category
+      # ---------------------------------------------------
+
+      - name: complexity_band
+
+        description: "Categorical complexity level."
+
+        tests:
+          - not_null
+
+          - accepted_values:
+
+              values:
+                - LOW
+                - MEDIUM
+                - HIGH
+
+
+
+  # =======================================================
+  # high_complexity_claims_daily Model
+  # =======================================================
+  # Final Gold reporting table
+  # =======================================================
+
+  - name: high_complexity_claims_daily
+
+    description: >
+      Gold business-facing reporting table containing
+      high-complexity claims.
+
+    columns:
+
+
+      # ---------------------------------------------------
+      # claim_id
+      # ---------------------------------------------------
+      # Unique identifier for high-complexity claim
+      # ---------------------------------------------------
+
+      - name: claim_id
+
+        description: "Unique claim identifier."
+
+        tests:
+          - not_null
+          - unique
+
+
+      # ---------------------------------------------------
+      # complexity_score
+      # ---------------------------------------------------
+      # Final calculated complexity score
+      # ---------------------------------------------------
+
+      - name: complexity_score
+
+        description: "Final calculated complexity score."
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # complexity_band
+      # ---------------------------------------------------
+      # Final Gold complexity category
+      # ---------------------------------------------------
+
+      - name: complexity_band
+
+        description: "Final complexity classification."
+
+        tests:
+          - not_null
+
+          - accepted_values:
+
+              values:
+                - HIGH
+
+
+      # ---------------------------------------------------
+      # report_date
+      # ---------------------------------------------------
+      # Date the Gold report was generated
+      # ---------------------------------------------------
+
+      - name: report_date
+
+        description: >
+          Date the Gold report was generated.
+
+        tests:
+          - not_null
+
+
+      # ---------------------------------------------------
+      # processed_at
+      # ---------------------------------------------------
+      # Timestamp record entered Gold layer
+      # ---------------------------------------------------
+
+      - name: processed_at
+
+        description: >
+          Timestamp when the record was processed into
+          the Gold table.
+
+        tests:
+          - not_null
